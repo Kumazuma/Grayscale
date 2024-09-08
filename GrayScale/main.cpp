@@ -63,6 +63,13 @@ bool GrayscaleApp::OnInit()
     m_spinCtrl = spinCtrl;
     m_sliderCtrl = slider;
     m_filePickerCtrl = picker;
+    spinCtrl->Bind(wxEVT_SPINCTRL,
+        [this](auto& event)
+        {
+            m_currentValue = event.GetSelection();
+            UpdatedValue();
+        });
+
     slider->Bind(wxEVT_SLIDER,
         [this](auto& event)
         {
@@ -91,6 +98,7 @@ bool GrayscaleApp::OnInit()
                 return;
 
             wxBufferedPaintDC dc{ m_paintPanel };
+            dc.Clear();
             dc.DrawBitmap(m_convertedBitmap, { 0, 0 });
         });
     return true;
