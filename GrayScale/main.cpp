@@ -24,8 +24,8 @@ private:
     
     int m_currentValue;
     wxImage m_originImage;
-    std::vector<uint8_t> m_convertedData;
     wxBitmap m_convertedBitmap;
+    wxImage m_convertedImage;
 };
 
 wxIMPLEMENT_APP(GrayscaleApp);
@@ -89,6 +89,7 @@ bool GrayscaleApp::OnInit()
             }
 
             m_originImage = image;
+            m_convertedImage = wxImage{m_originImage.GetSize()};
             UpdatedValue();
         });
 
@@ -116,15 +117,11 @@ void GrayscaleApp::UpdatedValue()
     const uint8_t* const rgbArray = m_originImage.GetData();
     auto originImageSize = m_originImage.GetSize();
     const auto numOfPixel = originImageSize.x * originImageSize.y;
-    const auto neededBytesWidth = numOfPixel * 3;
-    if (neededBytesWidth != m_convertedData.size())
-    {
-        m_convertedData.clear();
-        m_convertedData.resize(neededBytesWidth);
-    }
 
     // RGB에서 Brightness를 가져온다.
     const auto s = numOfPixel / 4;
+    __m128 floorThreshold = _mm_set_ps1(m_currentValue);
+    __m128 floorThresholdReverse = _mm_div_ps(_mm_set_ps1(1.f), floorThreshold);
     for (int i = 0; i < s; ++i)
     {
         //__m128i pixel0 = _mm_loadu_si16(rgbArray + (i * 4 + 0) * 3);
@@ -213,27 +210,28 @@ void GrayscaleApp::UpdatedValue()
         if (m_currentValue != 255)
         {
             Y0123 = _mm_mul_ps(Y0123, _mm_set_ps1(1 / 255.f));
-            Y0123 = _mm_div_ps(_mm_floor_ps(_mm_mul_ps(Y0123, _mm_set_ps1(m_currentValue))), _mm_set_ps1(m_currentValue));
+            Y0123 = _mm_mul_ps(_mm_floor_ps(_mm_mul_ps(Y0123, floorThreshold)), floorThresholdReverse);
             Y0123 = _mm_mul_ps(Y0123, _mm_set_ps1(255.f));
         }
 
         __m128i Y0124AsInt = _mm_cvtps_epi32(Y0123);
+        const int base = i * 4 * 3;
+        uint8_t* const desc = m_convertedImage.GetData() + base;
+        desc[0] = Y0124AsInt.m128i_u32[0];
+        desc[1] = Y0124AsInt.m128i_u32[0];
+        desc[2] = Y0124AsInt.m128i_u32[0];
 
-        m_convertedData[(i * 4 + 0) * 3 + 0] = Y0124AsInt.m128i_u32[0];
-        m_convertedData[(i * 4 + 0) * 3 + 1] = Y0124AsInt.m128i_u32[0];
-        m_convertedData[(i * 4 + 0) * 3 + 2] = Y0124AsInt.m128i_u32[0];
+        desc[3] = Y0124AsInt.m128i_u32[1];
+        desc[4] = Y0124AsInt.m128i_u32[1];
+        desc[5] = Y0124AsInt.m128i_u32[1];
 
-        m_convertedData[(i * 4 + 1) * 3 + 0] = Y0124AsInt.m128i_u32[1];
-        m_convertedData[(i * 4 + 1) * 3 + 1] = Y0124AsInt.m128i_u32[1];
-        m_convertedData[(i * 4 + 1) * 3 + 2] = Y0124AsInt.m128i_u32[1];
+        desc[6] = Y0124AsInt.m128i_u32[2];
+        desc[7] = Y0124AsInt.m128i_u32[2];
+        desc[8] = Y0124AsInt.m128i_u32[2];
 
-        m_convertedData[(i * 4 + 2) * 3 + 0] = Y0124AsInt.m128i_u32[2];
-        m_convertedData[(i * 4 + 2) * 3 + 1] = Y0124AsInt.m128i_u32[2];
-        m_convertedData[(i * 4 + 2) * 3 + 2] = Y0124AsInt.m128i_u32[2];
-
-        m_convertedData[(i * 4 + 3) * 3 + 0] = Y0124AsInt.m128i_u32[3];
-        m_convertedData[(i * 4 + 3) * 3 + 1] = Y0124AsInt.m128i_u32[3];
-        m_convertedData[(i * 4 + 3) * 3 + 2] = Y0124AsInt.m128i_u32[3];
+        desc[9] = Y0124AsInt.m128i_u32[3];
+        desc[10] = Y0124AsInt.m128i_u32[3];
+        desc[11] = Y0124AsInt.m128i_u32[3];
     }
 
     const auto m = numOfPixel % 4;
@@ -246,18 +244,18 @@ void GrayscaleApp::UpdatedValue()
         float y = r * 0.2126f + g * 0.7152f + 0.0722f * b;
         if (m_currentValue != 255)
         {
-            y *= 1 / 0.255f;
-            y = std::floor(y * m_currentValue) * m_currentValue;
+            y *= 1 / 255.f;
+            y = std::floor(y * m_currentValue) / m_currentValue;
             y *= 255.f;
         }
-
-        m_convertedData[i * 3 + 0] = y;
-        m_convertedData[i * 3 + 1] = y;
-        m_convertedData[i * 3 + 2] = y;
+        
+        uint8_t* const desc = m_convertedImage.GetData();
+        desc[i * 3 + 0] = y;
+        desc[i * 3 + 1] = y;
+        desc[i * 3 + 2] = y;
 
     }
 
-    wxImage convertedImage{ originImageSize.x, originImageSize.y, m_convertedData.data(), true };
-    m_convertedBitmap = convertedImage;
+    m_convertedBitmap = m_convertedImage;
     m_paintPanel->Refresh();
 }
