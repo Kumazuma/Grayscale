@@ -217,6 +217,7 @@ void GrayscaleApp::UpdatedValue()
         __m128i Y0124AsInt = _mm_cvtps_epi32(Y0123);
         const int base = i * 4 * 3;
         uint8_t* const desc = m_convertedImage.GetData() + base;
+#if defined(_M_AMD64)
         desc[0] = Y0124AsInt.m128i_u32[0];
         desc[1] = Y0124AsInt.m128i_u32[0];
         desc[2] = Y0124AsInt.m128i_u32[0];
@@ -232,6 +233,24 @@ void GrayscaleApp::UpdatedValue()
         desc[9] = Y0124AsInt.m128i_u32[3];
         desc[10] = Y0124AsInt.m128i_u32[3];
         desc[11] = Y0124AsInt.m128i_u32[3];
+#elif defined(_M_ARM64)
+        desc[0] = Y0124AsInt.n128_i32[0];
+        desc[1] = Y0124AsInt.n128_i32[0];
+        desc[2] = Y0124AsInt.n128_i32[0];
+
+        desc[3] = Y0124AsInt.n128_i32[1];
+        desc[4] = Y0124AsInt.n128_i32[1];
+        desc[5] = Y0124AsInt.n128_i32[1];
+
+        desc[6] = Y0124AsInt.n128_i32[2];
+        desc[7] = Y0124AsInt.n128_i32[2];
+        desc[8] = Y0124AsInt.n128_i32[2];
+
+        desc[9] = Y0124AsInt.n128_i32[3];
+        desc[10] = Y0124AsInt.n128_i32[3];
+        desc[11] = Y0124AsInt.n128_i32[3];
+
+#endif
     }
 
     const auto m = numOfPixel % 4;
@@ -253,7 +272,6 @@ void GrayscaleApp::UpdatedValue()
         desc[i * 3 + 0] = y;
         desc[i * 3 + 1] = y;
         desc[i * 3 + 2] = y;
-
     }
 
     m_convertedBitmap = m_convertedImage;
